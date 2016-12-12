@@ -1,4 +1,8 @@
-import Tkinter as TK
+try:  # Python 2/3 support
+	import Tkinter as TK
+except ImportError as e:
+	import tkinter as TK
+
 import threading
 from writeLog import NoteWriter
 

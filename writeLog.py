@@ -38,7 +38,7 @@ class NoteWriter(object):
 	def is_today(self, file_content):
 		today = "{0} -".format(self.today_date)
 		for line in file_content:
-			print line
+			print(line)
 			if str(today) == str(line.rstrip()):
 				return True
 		return False
