@@ -7,8 +7,9 @@ import datetime
 from collections import namedtuple
 import os
 
-
 class NoteWriter(object):
+	config = None
+
 	def __init__(self, notes_file):
 		self.week_range = self.get_week_range((datetime.datetime.today()))
 		self.today_date = datetime.date.today().strftime("%A")
@@ -68,11 +69,11 @@ class NoteWriter(object):
 
 	@staticmethod
 	def handle_message(message):
-		writer = NoteWriter("h:/notes.txt")
+		writer = NoteWriter(NoteWriter.config.get("out_file"))
 		writer.write_entry(message)
 
 	@staticmethod
-	def show_notes():
-		os.system('start ' + 'h:/notes.txt')
+	def show_notes(*args):
+		os.system('start ' + '{}'.format(NoteWriter.config.get("out_file")))
 
 
