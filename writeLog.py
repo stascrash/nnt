@@ -4,26 +4,32 @@ Created on 5 Mar 2014
 @author: stanislav.poritskiy
 '''
 import datetime
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 import os
 
-class NoteWriter(object):
-	config = None
 
-	def __init__(self, notes_file):
+class NoteWriter(object):
+
+	def __init__(self, config):
+		self.config = config
 		self.week_range = self.get_week_range((datetime.datetime.today()))
 		self.today_date = datetime.date.today().strftime("%A")
-		self.notes_file = notes_file
+		self.notes_file = self.config.get("out_file")
+		self.notes = defaultdict(list)
 
-	def write_entry(self, raw_entry):
+	def get_notes(self):
+		return self.notes
+
+	def write_entry(self, message):
+		self.notes[message.date].append(message)
 		with open(self.notes_file, "a+") as text_file:
 			file_content = text_file.readlines()
-			text_file.write(self.format_entry(raw_entry, file_content))
+			text_file.write(self.format_entry(message, file_content))
 		text_file.close()
 
 	def format_entry(self, raw_entry, file_content):
 		post = ''
-		message = '\t+ {0} \n'.format(raw_entry)
+		message = '\t+ {0} \n'.format(raw_entry())
 		if self.is_current_week(file_content):
 			if self.is_today(file_content):
 				post += message
@@ -67,10 +73,10 @@ class NoteWriter(object):
 		end_of_week = day + to_end_of_week
 		return (beginning_of_week.strftime("%B %d, %Y"), end_of_week.strftime("%B %d, %Y"))
 
-	@staticmethod
-	def handle_message(message):
-		writer = NoteWriter(NoteWriter.config.get("out_file"))
-		writer.write_entry(message)
+	# @staticmethod
+	# def handle_message(message):
+	# 	writer = NoteWriter()
+	# 	writer.write_entry(message())
 
 	@staticmethod
 	def show_notes(*args):

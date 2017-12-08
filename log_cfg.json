@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "disable_existing_loggers": false,
+  "formatters": {
+    "simple": {
+      "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    },
+    "notes_fmt": {
+      "class": "nnt_logger.NoteFormatter"
+    }
+  },
+  "handlers": {
+    "console": {
+      "class": "logging.StreamHandler",
+      "level": "DEBUG",
+      "formatter": "simple",
+      "stream": "ext://sys.stdout"
+    },
+    "notes": {
+      "class": "nnt_logger.NoteHandler",
+      "level": "DEBUG",
+      "formatter": "notes_fmt",
+      "stream": "ext://sys.stdout"
+    }
+  },
+  "loggers": {
+    "nnt": {
+      "level": "DEBUG",
+      "handlers": [
+        "console"
+      ],
+      "propagate": false
+    },
+    "nnt.notes": {
+      "level": "DEBUG",
+      "handlers": ["notes"],
+      "propagate": false
+    }
+  },
+  "root": {
+    "level": "INFO",
+    "handlers": []
+  }
+}
