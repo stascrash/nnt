@@ -14,6 +14,7 @@ import datetime
 import json
 import nnt_logger
 import logging
+import pickle
 nnt_logger.setup_logging()
 LOGGER = logging.getLogger("nnt")
 
@@ -36,6 +37,9 @@ class NoteController(Ui_Dialog, QDialog):
 		self.current_x = 0
 		self.current_y = 0
 
+		self.current_note = None
+		self.previous_note = None
+
 		self.set_style()
 		self.setModal(True)
 		self.setWindowFlags(Qt.FramelessWindowHint)
@@ -43,12 +47,17 @@ class NoteController(Ui_Dialog, QDialog):
 		# self.noteListWidget.setHidden(True)
 		self.user_input = None
 		self.writer = NoteModel()
+		self.load_saved_notes_in_view()
 		self.connect_signals()
 
-
+	def load_saved_notes_in_view(self):
+		for messages in self.writer.notes.values():
+			for message in reversed(messages):
+				self.update_note_widget(message)
 
 	def set_style(self):
-		with open("darkorange.stylesheet", "r") as fp:
+		self.noteListWidget.setAlternatingRowColors(True)
+		with open("style.stylesheet", "r") as fp:
 			self.setStyleSheet(fp.read())
 
 	def mouseMoveEvent(self, event):
@@ -75,10 +84,8 @@ class NoteController(Ui_Dialog, QDialog):
 		self.writer.commands.show_note_sgl.connect(self.on_show_note)
 
 	def on_note_changed(self, current, previous):
-		if current:
-			LOGGER.debug("Current: {}".format(current.text()))
-		if previous:
-			LOGGER.debug("Previous: {}".format(previous.text()))
+		self.current_note = current
+		self.previous_note = previous
 
 	def on_enter_pressed(self):
 		"""When user enters a message and hit's enter. """
@@ -87,6 +94,7 @@ class NoteController(Ui_Dialog, QDialog):
 		self.noteLineEdit.setText("")
 
 	def on_quit(self):
+		self.writer.save_notes()
 		self.accept()
 
 	def on_make_note(self, message):
@@ -102,6 +110,11 @@ class NoteController(Ui_Dialog, QDialog):
 		item.setText(" | ".join([time_str, message.preview_message]))
 		item.setData(Qt.UserRole, message)
 		self.noteListWidget.addItem(item)
+
+	def reject(self):
+		# We always want to save notes even when user presses ESC key
+		self.writer.save_notes()
+		super(NoteController, self).reject()
 
 
 class NoteMessage(object):
@@ -132,7 +145,6 @@ class NoteMessage(object):
 		formatted_user_input = user_input
 		return formatted_user_input
 
-
 	def __call__(self, *args, **kwargs):
 		return self.message
 
@@ -151,10 +163,12 @@ class NoteModel(QObject):
 	def __init__(self):
 		super(NoteModel, self).__init__()
 		self.settings_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "settings.json"))
+		self.notes_save_file = os.path.abspath(os.path.join(os.path.dirname(__file__), "notes.save"))
 		self.config = self._load_config()
 
 		self.commands = NoteCommands()
 		self.writer = NoteWriter(self.config)
+		self.restore_notes()
 
 	def check_input(self, usr_input):
 		if self.is_command(usr_input):
@@ -192,6 +206,15 @@ class NoteModel(QObject):
 
 	def make_note(self, message):
 		self.writer.write_entry(message)
+
+	def restore_notes(self):
+		if os.path.isfile(self.notes_save_file):
+			with open(self.notes_save_file, "rb") as fp:
+				self.writer.set_notes(pickle.load(fp))
+
+	def save_notes(self):
+		with open(self.notes_save_file, "wb") as fp:
+			pickle.dump(self.writer.get_notes(), fp, protocol=2)
 
 
 class NoteCommands(QObject):

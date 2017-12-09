@@ -20,6 +20,9 @@ class NoteWriter(object):
 	def get_notes(self):
 		return self.notes
 
+	def set_notes(self, loaded_notes):
+		self.notes = loaded_notes
+
 	def write_entry(self, message):
 		self.notes[message.date].append(message)
 		with open(self.notes_file, "a+") as text_file:
