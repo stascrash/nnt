@@ -8,8 +8,9 @@ import os
 import sys
 from ui import Ui_Dialog
 from writeLog import NoteWriter
-from PyQt5.QtWidgets import QDialog, QApplication, QListWidgetItem
-from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt
+from PyQt5.QtWidgets import QDialog, QApplication, QListWidgetItem, QListWidget, QFrame, QTextEdit
+from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt, QEvent
+
 import datetime
 import json
 import nnt_logger
@@ -25,6 +26,53 @@ NNT_COMMANDS = {"@q": "quit_cmd",
 				"_@makenote": "message_cmd"}
 
 
+class NoteListWidget(QListWidget):
+	delete_selection_sgl = pyqtSignal("PyQt_PyObject")
+
+	def __init__(self):
+		super(NoteListWidget, self).__init__()
+		self.setFrameShape(QFrame.NoFrame)
+		self.setFrameShadow(QFrame.Plain)
+		self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+		self.setProperty("showDropIndicator", False)
+		self.setObjectName("noteListWidget")
+		self.installEventFilter(self)
+
+		self.connect_signals()
+
+	def eventFilter(self, source, event):
+		if event.type() == QEvent.KeyPress:
+			self.execute_keyboard_command(event.key())
+
+		return super(NoteListWidget, self).eventFilter(source, event)
+
+	def execute_keyboard_command(self, event_key):
+		if event_key == Qt.Key_Return:
+			self.itemPressed.emit(self.current_note)
+		elif event_key == Qt.Key_Delete:
+			self.delete_selection_sgl.emit(self.current_note)
+			self.takeItem(self.row(self.current_note))
+
+	def connect_signals(self):
+		self.currentItemChanged.connect(self.on_note_changed)
+
+	def on_note_changed(self, current, previous):
+		self.current_note = current
+		self.previous_note = previous
+
+
+class NoteTextEdit(QTextEdit):
+	def __init__(self):
+		super(NoteTextEdit, self).__init__()
+		self.setDisabled(True)  # Re-think, we need to make it selectable
+		self.setFrameShape(QFrame.NoFrame)
+		self.setFrameShadow(QFrame.Plain)
+		self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+
+		self.current_note = None
+		self.previous_note = None
+
+
 class NoteController(Ui_Dialog, QDialog):
 	"""Main controller of NNT. It handles communication between user and
 	user command-line keys. NNT-Controller instantiates handlers and
@@ -33,18 +81,20 @@ class NoteController(Ui_Dialog, QDialog):
 	def __init__(self):
 		super(NoteController, self).__init__()
 		self.setupUi(self)
+		self.noteListWidget = NoteListWidget()
+		self.noteTextEdit = NoteTextEdit()
+		self.verticalLayout.addWidget(self.noteListWidget)
+		self.verticalLayout.addWidget(self.noteTextEdit)
+
 		self.mouse_left_click = False
 		self.current_x = 0
 		self.current_y = 0
 
-		self.current_note = None
-		self.previous_note = None
 
 		self.set_style()
 		self.setModal(True)
 		self.setWindowFlags(Qt.FramelessWindowHint)
 
-		# self.noteListWidget.setHidden(True)
 		self.user_input = None
 		self.writer = NoteModel()
 		self.load_saved_notes_in_view()
@@ -56,7 +106,10 @@ class NoteController(Ui_Dialog, QDialog):
 				self.update_note_widget(message)
 
 	def set_style(self):
+		self.noteListWidget.setHidden(True)
+		self.noteTextEdit.setHidden(True)
 		self.noteListWidget.setAlternatingRowColors(True)
+
 		with open("style.stylesheet", "r") as fp:
 			self.setStyleSheet(fp.read())
 
@@ -78,14 +131,18 @@ class NoteController(Ui_Dialog, QDialog):
 
 	def connect_signals(self):
 		self.noteLineEdit.returnPressed.connect(self.on_enter_pressed)
-		self.noteListWidget.currentItemChanged.connect(self.on_note_changed)
+		self.noteListWidget.itemPressed.connect(self.on_item_pressed)
+		self.noteListWidget.delete_selection_sgl.connect(self.on_delete)
+
 		self.writer.commands.quit_sgl.connect(self.on_quit)
 		self.writer.commands.make_note_sgl.connect(self.on_make_note)
 		self.writer.commands.show_note_sgl.connect(self.on_show_note)
 
-	def on_note_changed(self, current, previous):
-		self.current_note = current
-		self.previous_note = previous
+	def on_item_pressed(self, item):
+		message = item.data(Qt.UserRole)
+		self.noteTextEdit.setText(message())
+		self.noteTextEdit.setHidden(False)
+		self.noteListWidget.setHidden(True)
 
 	def on_enter_pressed(self):
 		"""When user enters a message and hit's enter. """
@@ -111,10 +168,24 @@ class NoteController(Ui_Dialog, QDialog):
 		item.setData(Qt.UserRole, message)
 		self.noteListWidget.addItem(item)
 
+	def on_delete(self, message_item):
+		message = message_item.data(Qt.UserRole)
+		self.writer.delete_note(message)
+
 	def reject(self):
-		# We always want to save notes even when user presses ESC key
-		self.writer.save_notes()
-		super(NoteController, self).reject()
+		if not self.noteListWidget.isHidden():
+			self.noteListWidget.setHidden(True)
+			return
+
+		if not self.noteTextEdit.isHidden():
+			self.noteTextEdit.setHidden(True)
+			self.noteListWidget.setHidden(False)
+			self.noteListWidget.setFocus()
+			return
+
+		if self.noteTextEdit.isHidden() and self.noteListWidget.isHidden():
+			self.writer.save_notes()
+			super(NoteController, self).reject()
 
 
 class NoteMessage(object):
@@ -215,6 +286,12 @@ class NoteModel(QObject):
 	def save_notes(self):
 		with open(self.notes_save_file, "wb") as fp:
 			pickle.dump(self.writer.get_notes(), fp, protocol=2)
+
+	def delete_note(self, note_to_delete):
+		for date, notes in self.notes.items():
+			if note_to_delete in notes:
+				notes.remove(note_to_delete)
+
 
 
 class NoteCommands(QObject):

@@ -12,7 +12,7 @@ class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
         Dialog.setWindowModality(QtCore.Qt.ApplicationModal)
-        Dialog.resize(211, 98)
+        Dialog.resize(211, 24)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Maximum, QtWidgets.QSizePolicy.Maximum)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -33,13 +33,6 @@ class Ui_Dialog(object):
         self.noteLineEdit.setObjectName("noteLineEdit")
         self.horizontalLayout_2.addWidget(self.noteLineEdit)
         self.verticalLayout.addLayout(self.horizontalLayout_2)
-        self.noteListWidget = QtWidgets.QListWidget(Dialog)
-        self.noteListWidget.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.noteListWidget.setFrameShadow(QtWidgets.QFrame.Plain)
-        self.noteListWidget.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.noteListWidget.setProperty("showDropIndicator", False)
-        self.noteListWidget.setObjectName("noteListWidget")
-        self.verticalLayout.addWidget(self.noteListWidget)
 
         self.retranslateUi(Dialog)
         QtCore.QMetaObject.connectSlotsByName(Dialog)
