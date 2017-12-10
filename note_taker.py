@@ -10,20 +10,21 @@ from ui import Ui_Dialog
 from writeLog import NoteWriter
 from PyQt5.QtWidgets import QDialog, QApplication, QListWidgetItem, QListWidget, QFrame, QTextEdit
 from PyQt5.QtCore import QObject, pyqtSignal, QThread, Qt, QEvent
-
+from string import Template
 import datetime
 import json
 import nnt_logger
 import logging
 import pickle
+
 nnt_logger.setup_logging()
 LOGGER = logging.getLogger("nnt")
 
 NNT_COMMAND_SEPARATOR = ":"
-NNT_COMMANDS = {"@q": "quit_cmd",
-				"@show": "show_cmd",
-				"@setoutput": "set_output_file_cmd",
-				"_@makenote": "message_cmd"}
+NNT_COMMANDS = {"/q": "quit_cmd",
+				"/show": "show_cmd",
+				"/setoutput": "set_output_file_cmd",
+				"_/makenote": "message_cmd"}
 
 
 class NoteListWidget(QListWidget):
@@ -64,13 +65,10 @@ class NoteListWidget(QListWidget):
 class NoteTextEdit(QTextEdit):
 	def __init__(self):
 		super(NoteTextEdit, self).__init__()
-		self.setDisabled(True)  # Re-think, we need to make it selectable
+		# self.setDisabled(True)  # Re-think, we need to make it selectable
 		self.setFrameShape(QFrame.NoFrame)
 		self.setFrameShadow(QFrame.Plain)
 		self.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-
-		self.current_note = None
-		self.previous_note = None
 
 
 class NoteController(Ui_Dialog, QDialog):
@@ -89,7 +87,6 @@ class NoteController(Ui_Dialog, QDialog):
 		self.mouse_left_click = False
 		self.current_x = 0
 		self.current_y = 0
-
 
 		self.set_style()
 		self.setModal(True)
@@ -202,6 +199,15 @@ class NoteMessage(object):
 		self.date = datetime.datetime.now()
 		self.message = self._format_user_input(user_input)
 		self.preview_message = self.trim_message()
+		self.formatted_message = self._format_to_html()
+
+	def _format_to_html(self):
+		with open("note_template.html") as fb:
+			msg_template_str = "\n".join(fb.readlines())
+		msg_template = Template(msg_template_str)
+		return msg_template.safe_substitute(date=self.date.strftime("%y/%m/%d - %H:%M:%S"),
+											message_preview=self.preview_message,
+											message=self.message)
 
 	def trim_message(self):
 		if len(self.message) > 27:
@@ -217,7 +223,7 @@ class NoteMessage(object):
 		return formatted_user_input
 
 	def __call__(self, *args, **kwargs):
-		return self.message
+		return self.formatted_message
 
 	def __hash__(self):
 		return hash(self.message)
@@ -245,7 +251,7 @@ class NoteModel(QObject):
 		if self.is_command(usr_input):
 			self.execute_command(usr_input)
 		else:
-			self.execute_command(NNT_COMMAND_SEPARATOR.join(["_@makenote", usr_input]))
+			self.execute_command(NNT_COMMAND_SEPARATOR.join(["_/makenote", usr_input]))
 
 	def is_command(self, usr_input):
 		try:
@@ -291,7 +297,6 @@ class NoteModel(QObject):
 		for date, notes in self.notes.items():
 			if note_to_delete in notes:
 				notes.remove(note_to_delete)
-
 
 
 class NoteCommands(QObject):
